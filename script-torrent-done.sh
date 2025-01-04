@@ -6,55 +6,6 @@ SCRIPT_LOG="/config/logs/transmission-scripts.log"
 source /mnt/Lewis/Media/scripts/lib/shloglib.sh
 SHLOG_FILE="$SCRIPT_LOG"
 
-: <<'OLD_LOG_FUNCS'
-function SCRIPTENTRY(){
-    timeAndDate=`date`
-    script_name=`basename "$0"`
-    script_name="${script_name%.*}"
-    echo "[$timeAndDate] [DEBUG]  > $script_name $FUNCNAME" >> $SCRIPT_LOG
-}
-
-function SCRIPTEXIT(){
-    timeAndDate=`date`
-    script_name=`basename "$0"`
-    script_name="${script_name%.*}"
-    echo "[$timeAndDate] [DEBUG]  < $script_name $FUNCNAME" >> $SCRIPT_LOG
-}
-
-function ENTRY(){
-    local cfn="${FUNCNAME[1]}"
-    timeAndDate=`date`
-    echo "[$timeAndDate] [DEBUG]  > $cfn $FUNCNAME" >> $SCRIPT_LOG
-}
-
-function EXIT(){
-    local cfn="${FUNCNAME[1]}"
-    timeAndDate=`date`
-    echo "[$timeAndDate] [DEBUG]  < $cfn $FUNCNAME" >> $SCRIPT_LOG
-}
-
-function INFO(){
-    local function_name="${FUNCNAME[1]}"
-    local msg="$1"
-    timeAndDate=`date`
-    echo "[$timeAndDate] [INFO]  $msg" >> $SCRIPT_LOG
-}
-
-function DEBUG(){
-    local function_name="${FUNCNAME[1]}"
-    local msg="$1"
-    timeAndDate=`date`
-    echo "[$timeAndDate] [DEBUG]  $msg" >> $SCRIPT_LOG
-}
-
-function ERROR(){
-    local function_name="${FUNCNAME[1]}"
-    local msg="$1"
-    timeAndDate=`date`
-    echo "[$timeAndDate] [ERROR]  $msg" >> $SCRIPT_LOG
-}
-OLD_LOG_FUNCS
-
 # Function to hardlink files recursively to a new destination
 hardlink_files() {
     ShLogEnter $FUNCNAME
@@ -99,7 +50,7 @@ hardlink_files() {
 
 # Function to read the destination for a tag from an external yaml file
 read_destinations_from_yaml() {
-    ShLogDebug "RDFY: Reading destinations for tag: $tag"
+    ShLogDebug "Reading destinations for tag: $tag"
     awk -v tag="$tag" '
     BEGIN {in_tags=0; in_tag=0}
     /^torrent-tags:/ {in_tags=1; next}
@@ -121,30 +72,6 @@ read_destinations_from_yaml() {
         print destination
     }
     ' "$CONFIG_FILE" 2>> "$SCRIPT_LOG"
-}
-
-# Function to initialize log file
-init_log_file() {
-    ShLogEnter $FUNCNAME
-    local log_dir=$(dirname "$SCRIPT_LOG")
-    
-    if [[ ! -d "$log_dir" ]]; then
-        mkdir -p "$log_dir" 2>/dev/null || {
-            ShLogError "Failed to create log directory: $log_dir"
-            ShLogLeave $FUNCNAME
-            return 1
-        }
-    fi
-    
-    if [[ ! -f "$SCRIPT_LOG" ]]; then
-        touch "$SCRIPT_LOG" 2>/dev/null || {
-            ShLogError "Failed to create log file: $SCRIPT_LOG"
-            ShLogLeave $FUNCNAME
-            return 1
-        }
-    fi
-    ShLogLeave $FUNCNAME
-    return 0
 }
 
 # Function to print environment variables for debugging
@@ -181,27 +108,27 @@ print_debug_info() {
 # Function to print configuration details
 print_config_details() {
     ShLogEnter $FUNCNAME
-    ShLogInfo "PCD: Using configuration file: $CONFIG_FILE"
+    ShLogInfo "Using configuration file: $CONFIG_FILE"
     
     # Check if config file exists and is readable
     if [[ ! -f "$CONFIG_FILE" ]]; then
-        ShLogError "PCD: Configuration file does not exist: $CONFIG_FILE"
+        ShLogError "Configuration file does not exist: $CONFIG_FILE"
         return 1
     fi
     
     if [[ ! -r "$CONFIG_FILE" ]]; then
-        ShLogError "PCD: Configuration file is not readable: $CONFIG_FILE"
+        ShLogError "Configuration file is not readable: $CONFIG_FILE"
         return 1
     fi
     
-    ShLogDebug "PCD: Configuration file contents:"
+    ShLogDebug "Configuration file contents:"
     ShLogDebug "------------------------"
     while IFS= read -r line; do
         ShLogDebug "$line"
     done < "$CONFIG_FILE"
     ShLogDebug "------------------------"
     
-    ShLogDebug "PCD: Reading configured torrent tags and destinations:"
+    ShLogDebug "Reading configured torrent tags and destinations:"
     # Modified awk command with more verbose output
     awk '
     BEGIN {found_tags=0}
@@ -224,15 +151,8 @@ print_config_details() {
         print "DEBUG: PCD: Found destination for tag " tag ": " destination
     }
     ' "$CONFIG_FILE" >> "$SCRIPT_LOG"
-    
-    # # Original tag processing
-    # while IFS= read -r line; do
-    #     if [[ $line =~ ^[[:space:]]*([^:]+):[[:space:]]*$ ]]; then
-    #         local tag="${BASH_REMATCH[1]}"
-    #         ShLogDebug "Tag found: $tag"
-    #     fi
-    # done < "$CONFIG_FILE"
 }
+
 # Main function
 main() {
     ShLogEnter $FUNCNAME
