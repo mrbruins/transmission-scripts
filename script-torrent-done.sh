@@ -1,9 +1,12 @@
 #!/bin/bash
 
-#CONFIG_FILE="${CONFIG_FILE:-$(dirname "$0")/transmission-config.yaml}"
 CONFIG_FILE="/app-data/scripts/transmission/transmission-config.yaml"
 SCRIPT_LOG="/config/logs/transmission-scripts.log"
 
+source /mnt/Lewis/Media/scripts/lib/shloglib.sh
+SHLOG_FILE="$SCRIPT_LOG"
+
+: <<'OLD_LOG_FUNCS'
 function SCRIPTENTRY(){
     timeAndDate=`date`
     script_name=`basename "$0"`
@@ -50,23 +53,24 @@ function ERROR(){
     timeAndDate=`date`
     echo "[$timeAndDate] [ERROR]  $msg" >> $SCRIPT_LOG
 }
+OLD_LOG_FUNCS
 
 # Function to hardlink files recursively to a new destination
 hardlink_files() {
-    ENTRY
+    ShLogEnter $FUNCNAME
     local source_dir=$1
     local dest_dir=$2
     
-    DEBUG "Hardlinking files from '$source_dir' to '$dest_dir'"
+    ShLogDebug "Hardlinking files from '$source_dir' to '$dest_dir'"
     
     if [[ ! -d "$source_dir" ]]; then
-        ERROR "Source directory does not exist: $source_dir"
-        EXIT
+        ShLogError "Source directory does not exist: $source_dir"
+        ShLogLeave $FUNCNAME
         return 1
     fi
     
     if [[ ! -d "$dest_dir" ]]; then
-        DEBUG "Creating destination directory: $dest_dir"
+        ShLogDebug "Creating destination directory: $dest_dir"
         mkdir -p "$dest_dir"
     fi
     
@@ -75,28 +79,27 @@ hardlink_files() {
         local target_path="$dest_dir/$rel_path"
         local target_dir=$(dirname "$target_path")
         
-        DEBUG "Processing file: $file"
-        DEBUG "Target path: $target_path"
+        ShLogDebug "Processing file: $file"
+        ShLogDebug "Target path: $target_path"
         
         if [[ ! -d "$target_dir" ]]; then
-            DEBUG "Creating target directory: $target_dir"
+            ShLogDebug "Creating target directory: $target_dir"
             mkdir -p "$target_dir"
         fi
         
         if ln "$file" "$target_path" 2>>"$SCRIPT_LOG"; then
-            DEBUG "Successfully hardlinked: $file -> $target_path"
+            ShLogDebug "Successfully hardlinked: $file -> $target_path"
         else
-            ERROR "Failed to hardlink: $file -> $target_path"
-            ERROR "Linking error: $(ln "$file" "$target_path" 2>&1)"
+            ShLogError "Failed to hardlink: $file -> $target_path"
+            ShLogError "Linking error: $(ln "$file" "$target_path" 2>&1)"
         fi
     done
-    EXIT
+    ShLogLeave $FUNCNAME
 }
 
 # Function to read the destination for a tag from an external yaml file
 read_destinations_from_yaml() {
-    local tag=$1
-    DEBUG "RDFY: Reading destinations for tag: $tag"
+    ShLogDebug "RDFY: Reading destinations for tag: $tag"
     awk -v tag="$tag" '
     BEGIN {in_tags=0; in_tag=0}
     /^torrent-tags:/ {in_tags=1; next}
@@ -122,35 +125,35 @@ read_destinations_from_yaml() {
 
 # Function to initialize log file
 init_log_file() {
-    ENTRY
+    ShLogEnter $FUNCNAME
     local log_dir=$(dirname "$SCRIPT_LOG")
     
     if [[ ! -d "$log_dir" ]]; then
         mkdir -p "$log_dir" 2>/dev/null || {
-            ERROR "Failed to create log directory: $log_dir"
-            EXIT
+            ShLogError "Failed to create log directory: $log_dir"
+            ShLogLeave $FUNCNAME
             return 1
         }
     fi
     
     if [[ ! -f "$SCRIPT_LOG" ]]; then
         touch "$SCRIPT_LOG" 2>/dev/null || {
-            ERROR "Failed to create log file: $SCRIPT_LOG"
-            EXIT
+            ShLogError "Failed to create log file: $SCRIPT_LOG"
+            ShLogLeave $FUNCNAME
             return 1
         }
     fi
-    EXIT
+    ShLogLeave $FUNCNAME
     return 0
 }
 
 # Function to print environment variables for debugging
 print_debug_info() {
-    ENTRY
+    ShLogEnter $FUNCNAME
     local debug_enabled=$(awk '/^debug_enabled:/{print $2}' "$CONFIG_FILE")
     
     if [[ "$debug_enabled" != "true" ]]; then
-        EXIT
+        ShLogLeave $FUNCNAME
         return 0
     fi
     
@@ -167,38 +170,38 @@ print_debug_info() {
         "TR_TORRENT_TRACKERS"
     )
     
-    DEBUG "=== Debug Information ==="
+    ShLogDebug "=== Debug Information ==="
     for var in "${vars[@]}"; do
-        DEBUG "$var = ${!var}"
+        ShLogDebug "$var = ${!var}"
     done
-    DEBUG "======================="
-    EXIT
+    ShLogDebug "======================="
+    ShLogLeave $FUNCNAME
 }
 
 # Function to print configuration details
 print_config_details() {
-    ENTRY
-    INFO "PCD: Using configuration file: $CONFIG_FILE"
+    ShLogEnter $FUNCNAME
+    ShLogInfo "PCD: Using configuration file: $CONFIG_FILE"
     
     # Check if config file exists and is readable
     if [[ ! -f "$CONFIG_FILE" ]]; then
-        ERROR "PCD: Configuration file does not exist: $CONFIG_FILE"
+        ShLogError "PCD: Configuration file does not exist: $CONFIG_FILE"
         return 1
     fi
     
     if [[ ! -r "$CONFIG_FILE" ]]; then
-        ERROR "PCD: Configuration file is not readable: $CONFIG_FILE"
+        ShLogError "PCD: Configuration file is not readable: $CONFIG_FILE"
         return 1
     fi
     
-    DEBUG "PCD: Configuration file contents:"
-    DEBUG "------------------------"
+    ShLogDebug "PCD: Configuration file contents:"
+    ShLogDebug "------------------------"
     while IFS= read -r line; do
-        DEBUG "$line"
+        ShLogDebug "$line"
     done < "$CONFIG_FILE"
-    DEBUG "------------------------"
+    ShLogDebug "------------------------"
     
-    DEBUG "PCD: Reading configured torrent tags and destinations:"
+    ShLogDebug "PCD: Reading configured torrent tags and destinations:"
     # Modified awk command with more verbose output
     awk '
     BEGIN {found_tags=0}
@@ -226,13 +229,13 @@ print_config_details() {
     # while IFS= read -r line; do
     #     if [[ $line =~ ^[[:space:]]*([^:]+):[[:space:]]*$ ]]; then
     #         local tag="${BASH_REMATCH[1]}"
-    #         DEBUG "Tag found: $tag"
+    #         ShLogDebug "Tag found: $tag"
     #     fi
     # done < "$CONFIG_FILE"
 }
 # Main function
 main() {
-    SCRIPTENTRY
+    ShLogEnter $FUNCNAME
     
     # Add configuration details printing
     print_config_details
@@ -241,11 +244,11 @@ main() {
     local source_dir=$TR_TORRENT_DIR
     local tags=$(echo "$TR_TORRENT_LABELS" | tr ',' ' ')
 
-    DEBUG "MAIN: Processing torrent labels: $tags"
+    ShLogDebug "MAIN: Processing torrent labels: $tags"
     
     if [[ -z "$tags" ]]; then
-        DEBUG "MAIN: No labels found for torrent '$TR_TORRENT_NAME'"
-        SCRIPTEXIT
+        ShLogDebug "MAIN: No labels found for torrent '$TR_TORRENT_NAME'"
+        ShLogLeave $FUNCNAME
         exit 1
     fi
 
@@ -253,17 +256,17 @@ main() {
         local destinations=$(read_destinations_from_yaml "$tag")
 
         if [[ -z "$destinations" ]]; then
-            INFO "MAIN: No destinations found for label $tag"
+            ShLogInfo "MAIN: No destinations found for label $tag"
             continue
         fi
 
         while IFS= read -r dest_dir; do
             [[ -z "$dest_dir" ]] && continue
             hardlink_files "$source_dir" "$dest_dir"
-            INFO "MAIN: Hardlinked files from $source_dir to $dest_dir for label $tag"
+            ShLogInfo "MAIN: Hardlinked files from $source_dir to $dest_dir for label $tag"
         done <<< "$destinations"
     done
-    SCRIPTEXIT
+    ShLogLeave $FUNCNAME
 }
 
 main
