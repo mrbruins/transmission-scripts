@@ -1,0 +1,9 @@
+debug_enabled: true
+torrent-tags:
+  tag1:
+    - /path/to/destination1
+    - /path/to/destination2
+  tag2:
+    - /path/to/destination3
+    - /path/to/destination4
+log-file: /path/to/transmission.log
